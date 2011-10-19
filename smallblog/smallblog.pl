@@ -7,9 +7,9 @@ use DBI;
 
 #conf
 my $limit_page = 5;
-my $site_title = "Matthew Sporleder's blog";
-my $site_description = "blog about NetBSD, programming, and the web";
-my $site_author = "Matthew Sporleder";
+my $site_title = "smallblog blog";
+my $site_description = "blog about stuff";
+my $site_author = "me!";
 
 app->secret('mojosmallblog');
 
@@ -106,6 +106,7 @@ get '/(:entry)' => {entry => 'latest'} => sub
     chomp $slug;
     my $latest = get_entry($entry_db, $slug, 0); 
     $self->stash(content => $latest);
+    $self->stash(total_page => 0);
     $self->render;
   }
   
