@@ -6,10 +6,18 @@ use Data::Dumper;
 use DBI;
 
 #conf
-my $limit_page = 5;
-my $site_title = "smallblog blog";
-my $site_description = "blog about stuff";
-my $site_author = "me!";
+my $config = plugin 'Config' => default =>
+{
+limit_page => 5,
+site_title => "smallblog blog",
+site_description => "blog about stuff",
+site_author => "me"
+};
+
+my $limit_page = $config->{limit_page};
+my $site_title = $config->{site_title};
+my $site_description = $config->{site_description};
+my $site_author = $config->{site_author};
 
 app->secret('mojosmallblog');
 
@@ -198,6 +206,7 @@ app->start;
 __DATA__
 
 @@ entry.html.ep
+<div id="blog">
 % foreach my $art (@$content)
 % {
 % my $slug = Mojo::Util::b64_decode $art->{slug};
@@ -211,6 +220,7 @@ __DATA__
 % {
 <%== "<a href=\"?page=$i\">$i</a> " %>
 % }
+</div>
 
 @@ rss.xml.ep
 <?xml version="1.0" encoding="UTF-8" ?>
