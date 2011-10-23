@@ -10,6 +10,7 @@ use Time::Piece;
 #conf
 my $config = plugin 'Config' => default =>
 {
+page_ttl => 2880,
 limit_page => 5,
 site_title => "smallblog blog",
 site_description => "blog about stuff",
@@ -18,6 +19,7 @@ username => "admin",
 password => "smallblog"
 };
 
+my $page_ttl = $config->{page_ttl};
 my $limit_page = $config->{limit_page};
 my $site_title = $config->{site_title};
 my $site_description = $config->{site_description};
@@ -30,6 +32,7 @@ $entry_db = $entry_db . "/entry.db";
 
 any '/admin' => sub {
   my $self = shift;
+  $self->res->headers->cache_control("no-cache");
 #get auth
   if (! $self->req->headers->authorization || ! check_auth($self->req->headers->authorization) )
   {
@@ -69,9 +72,6 @@ any '/admin' => sub {
     }
   }
 #/newpost
-
-
-
   $self->render('admin');
 };
 
@@ -90,6 +90,7 @@ get '/rss.xml' => sub
   $self->stash(site_title => $site_title);
   $self->stash(site_description => $site_description);
   $self->stash(site_author => $site_author);
+  $self->stash(page_ttl => $page_ttl);
   $self->render;
 };
 
@@ -105,9 +106,10 @@ get '/atom.xml' => sub
 };
 
 #last because it catches everything else
-get '/(:entry)' => {entry => 'latest'} => sub
+get '/(*entry)' => {entry => 'latest'} => sub
 {
   my $self = shift;
+  $self->res->headers->cache_control("public, max-age=$page_ttl");
   if ($self->param('entry') eq 'latest')
   {
   #get the latest entries
@@ -128,6 +130,11 @@ get '/(:entry)' => {entry => 'latest'} => sub
     $slug = Mojo::Util::b64_encode $slug;
     chomp $slug;
     my $latest = get_entry($entry_db, $slug, 0); 
+    if (! $latest->[0])
+    {
+      $self->res->code("404");
+      $self->render('404');
+    }
     $self->stash(content => $latest);
     $self->stash(total_page => 0);
     $self->render;
@@ -209,15 +216,15 @@ sub get_entry
   $dbh->do("PRAGMA foreign_keys = ON");
   my $sql;
   my $res;
-  my @keys = ("id", "sb_date", "slug", "title", "text");
+  my @keys = ("blog.id", "blog.sb_date", "blog.slug", "blog.title", "blog.text", "tags.text as t_text");
   my $keys_txt = join(",", @keys);
   if ($entry eq "0")
   {
-    $sql = "SELECT $keys_txt from blog ORDER BY strftime('%s',sb_date) DESC LIMIT $limit_page OFFSET $cur_page";
+    $sql = "SELECT $keys_txt from blog INNER JOIN tags ON blog.id = tags.ref ORDER BY strftime('%s',blog.sb_date) DESC LIMIT $limit_page OFFSET $cur_page";
   }
   else
   {
-    $sql = "SELECT $keys_txt from blog WHERE slug = \"$entry\"";
+    $sql = "SELECT $keys_txt from blog INNER JOIN tags ON blog.id = tags.ref WHERE slug = \"$entry\"";
   }
 #TODO add better error handling
   $res = $dbh->selectall_arrayref($sql, { Slice => {} });
@@ -245,9 +252,11 @@ __DATA__
 <div id=<%== "$art->{id}" %> class="entry">
 <h5><span class="title"><%== $art->{title} %>, </span> <span class="sb_date"><%== $art->{sb_date} %></span> <span class="slug"><%= link_to "#" => "$slug" %></span></h5>
 <div class="text"><%== $art->{text} %></div>
+<p><span class="tags">tags: <%= join(", ", split(/\s+/, $art->{t_text})) %></span></p>
 </div>
 <div class="between"><hr /><br /></div>
 % }
+<div class="botnav">
 % for (my $i = 0; $i <= $total_page; $i++)
 % {
 %  if ($total_page > 1)
@@ -265,7 +274,7 @@ __DATA__
 <title><%= $site_title %></title>
 <description><%= $site_description %></description>
 <link><%= (url_for "entry")->to_abs %></link>
-<ttl>1440</ttl>
+<ttl><%= $page_ttl %></ttl>
 % foreach my $art (@$content)
 % {
 % my $slug = Mojo::Util::b64_decode $art->{slug};
@@ -368,5 +377,16 @@ edit post<br />
     <TITLE>Error</TITLE>
     <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
   </HEAD>
-  <BODY><H1>401 Unauthorized.</H1><%= $auth %></BODY>
+  <BODY><H1>401 Unauthorized.</H1></BODY>
+</HTML>
+
+@@ 404.html.ep
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+ "http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<HTML>
+  <HEAD>
+    <TITLE>Error</TITLE>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
+  </HEAD>
+  <BODY><H1>404 not found.</H1></BODY>
 </HTML>
