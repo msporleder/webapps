@@ -4,6 +4,8 @@ use Mojo::ByteStream;
 use Mojo::Util;
 use Data::Dumper;
 use DBI;
+use Mojo::Headers;
+use Time::Piece;
 
 #conf
 my $config = plugin 'Config' => default =>
@@ -11,7 +13,9 @@ my $config = plugin 'Config' => default =>
 limit_page => 5,
 site_title => "smallblog blog",
 site_description => "blog about stuff",
-site_author => "me"
+site_author => "me",
+username => "admin",
+password => "smallblog"
 };
 
 my $limit_page = $config->{limit_page};
@@ -24,8 +28,16 @@ app->secret('mojosmallblog');
 my $entry_db = app->home;
 $entry_db = $entry_db . "/entry.db";
 
-get '/admin' => sub {
+any '/admin' => sub {
   my $self = shift;
+#get auth
+  if (! $self->req->headers->authorization || ! check_auth($self->req->headers->authorization) )
+  {
+    $self->res->headers->www_authenticate("Basic realm=\"$site_title\"");
+    $self->res->code("401");
+    $self->stash(auth => $self->req->headers->authorization);
+    $self->render('401');
+  }
 
   if ($self->req->param("create_db") eq 1)
   {
@@ -36,30 +48,33 @@ get '/admin' => sub {
       $self->render(text => "creating db");
     }
   }
-    
+
+  if ($self->req->param("newpost") eq 1)
+  {
+    if ($self->req->method =~ /(?i:get)/)
+    {
+      $self->render('newpost');
+    }
+    if ($self->req->method =~ /(?i:post)/)
+    {
+      my $title = $self->param('title');
+      my $entry = $self->param('entry');
+      my $tags = $self->param('tags');
+      my $date = $self->param('date') || 'now';
+      if ($title and $entry)
+      {
+        insert_entry($entry_db, $title, $entry, $tags, $date);
+        $self->render(text => "$title, $entry <br />$tags");
+      }
+    }
+  }
+#/newpost
+
+
+
   $self->render('admin');
 };
 
-any '/newpost' => sub
-{
-  my $self = shift;
-  if ($self->req->method =~ /(?i:get)/)
-  {
-    $self->render('newpost');
-  }
-  if ($self->req->method =~ /(?i:post)/)
-  {
-    my $title = $self->param('title');
-    my $entry = $self->param('entry');
-    my $tags = $self->param('tags');
-    my $date = $self->param('date') || 'now';
-    if ($title and $entry)
-    {
-      insert_entry($entry_db, $title, $entry, $tags, $date);
-      $self->render(text => "$title, $entry <br />$tags");
-    }
-  }
-};
 
 any '/editpost' => sub
 {
@@ -119,6 +134,23 @@ get '/(:entry)' => {entry => 'latest'} => sub
   }
   
 };
+
+sub check_auth
+{
+  my $auth = shift;
+  chomp $auth;
+  $auth =~ s/(?i-smx:Basic\s*)?//g;
+  $auth = Mojo::Util::b64_decode $auth;
+  (my $u, my $p) = split(':', $auth);
+  if ($u eq $config->{username} && $p eq $config->{password})
+  {
+    return 1; #true
+  }
+  else
+  {
+    return 0; #false
+  }
+}
 
 sub init_entry_db
 {
@@ -218,26 +250,33 @@ __DATA__
 % }
 % for (my $i = 0; $i <= $total_page; $i++)
 % {
+%  if ($total_page > 1)
+%  {
 <%== "<a href=\"?page=$i\">$i</a> " %>
+%  }
 % }
 </div>
 
 @@ rss.xml.ep
 <?xml version="1.0" encoding="UTF-8" ?>
-<rss version="2.0">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
 <channel>
+<atom:link href="<%= (url_for)->to_abs %>" rel="self" type="application/rss+xml" />
 <title><%= $site_title %></title>
 <description><%= $site_description %></description>
-<link><%= url_for "/" %></link>
+<link><%= (url_for "entry")->to_abs %></link>
 <ttl>1440</ttl>
 % foreach my $art (@$content)
 % {
 % my $slug = Mojo::Util::b64_decode $art->{slug};
 <item>
  <title><%= $art->{title} %></title>
- <link><%= url_for $slug %></link>
- <author><%= $site_author %></author>
- <pubDate><%= $art->{sb_date} %></pubDate>
+ <link><%= (url_for $slug)->to_abs %></link>
+ <guid><%= (url_for $slug)->to_abs %></guid>
+ <dc:creator xmlns:dc="http://purl.org/dc/elements/1.1/"><%= $site_author %></dc:creator>
+% my $t822 = Time::Piece->strptime("$art->{sb_date}", "%Y-%m-%d %T");
+% my $t822_stamp = $t822->day . ", " . $t822->mday ." ". $t822->monname ." ". $t822->year ." ". $t822->hms ." ". "GMT";
+ <pubDate><%= $t822_stamp %></pubDate>
  <description><%= $art->{text} %></description>
 </item>
 % }
@@ -275,13 +314,13 @@ __DATA__
 <%= link_to url_for->query(create_db => 1) => begin %>create db<% end %>
 </p>
 <p>
-<%= link_to "new post" => 'newpost' %>
+<%= link_to url_for->query(newpost => 1) => begin %>new post<% end %>
 </p>
 <p>
-<%= link_to "edit posts" => 'editpost' %>
+<%= link_to url_for->query(editpost => 1) => begin %>edit post<% end %>
 </p>
 <p>
-<%= link_to "upload media" => 'uploadmedia' %>
+<%= link_to url_for->query(upload => 1) => begin %>upload media<% end %>
 </p>
 </body>
 </html>
@@ -290,7 +329,7 @@ __DATA__
 <html>
 <head><title>new post</title></head>
 <body>
-<form method="post" action="<%= url_for('newpost') %>">
+<form method="post" action="<%= url_for('admin')->query(newpost => 1) %>">
  <table class="new">
  <tr>
   <td>title</td>
@@ -320,3 +359,14 @@ add tags<br />
 edit post<br />
 </body>
 </html>
+
+@@ 401.html.ep
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+ "http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<HTML>
+  <HEAD>
+    <TITLE>Error</TITLE>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
+  </HEAD>
+  <BODY><H1>401 Unauthorized.</H1><%= $auth %></BODY>
+</HTML>
