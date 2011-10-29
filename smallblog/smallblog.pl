@@ -119,6 +119,7 @@ get '/(*entry)' => {entry => 'latest'} => sub
     $self->stash(content => $latest);
     $self->stash(cur_page => $cur_page);
     $self->stash(total_page => $total_page->[0]->{tot});
+    $self->stash(site_title => $site_title);
     $self->render;
   }
   else
@@ -137,6 +138,7 @@ get '/(*entry)' => {entry => 'latest'} => sub
     }
     $self->stash(content => $latest);
     $self->stash(total_page => 0);
+    $self->stash(site_title => $latest->[0]->{title});
     $self->render;
   }
   
@@ -245,6 +247,8 @@ app->start;
 __DATA__
 
 @@ entry.html.ep
+% layout 'entry', title => $site_title;
+<body>
 <div id="blog">
 % foreach my $art (@$content)
 % {
@@ -264,6 +268,7 @@ __DATA__
 <%== "<a href=\"?page=$i\">$i</a> " %>
 %  }
 % }
+</div>
 </div>
 
 @@ rss.xml.ep
