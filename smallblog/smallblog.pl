@@ -16,7 +16,8 @@ site_title => "smallblog blog",
 site_description => "blog about stuff",
 site_author => "me",
 username => "admin",
-password => "smallblog"
+password => "smallblog",
+entry_db_base => app->home . "/db"
 };
 
 my $page_ttl = $config->{page_ttl};
@@ -24,11 +25,10 @@ my $limit_page = $config->{limit_page};
 my $site_title = $config->{site_title};
 my $site_description = $config->{site_description};
 my $site_author = $config->{site_author};
+my $entry_db = $config->{entry_db_base} . "/entry.db";
 
 app->secret('mojosmallblog');
 
-my $entry_db = app->home;
-$entry_db = $entry_db . "/entry.db";
 
 any '/admin' => sub {
   my $self = shift;
@@ -192,11 +192,11 @@ sub insert_entry
   $slug = Mojo::Util::b64_encode $slug;
   chomp $slug;
   my @tags = split(/\s*\,\s*/, $tag_str);
-  my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","");
+  my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","") or die "connect: $DBI::errstr $dbfile";
   $dbh->do("PRAGMA foreign_keys = ON");
 #TODO add better error handling
   my $sth = $dbh->prepare("INSERT INTO blog( title, text, slug, sb_date ) VALUES(?, ?, ?, datetime(?))");
-  $sth->execute( "$title", "$text", "$slug", "$date" );
+  $sth->execute( "$title", "$text", "$slug", "$date" ) or die "execute $DBI::errstr $dbfile";
   my $lastid = $dbh->func('last_insert_rowid');
   
   for my $t (@tags)
@@ -336,6 +336,9 @@ __DATA__
 <p>
 <%= link_to url_for->query(upload => 1) => begin %>upload media<% end %>
 </p>
+<ul>
+<li><%= app->home %>/<%= $entry_db %></li>
+</ul>
 </body>
 </html>
 
