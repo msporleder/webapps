@@ -91,7 +91,7 @@ get '/rss.xml' => sub
   $self->stash(site_description => $site_description);
   $self->stash(site_author => $site_author);
   $self->stash(page_ttl => $page_ttl);
-  $self->render;
+  $self->render('rss');
 };
 
 get '/atom.xml' => sub
@@ -102,7 +102,7 @@ get '/atom.xml' => sub
   $self->stash(site_title => $site_title);
   $self->stash(site_description => $site_description);
   $self->stash(site_author => $site_author);
-  $self->render;
+  $self->render('atom');
 };
 
 #last because it catches everything else
@@ -337,7 +337,6 @@ __DATA__
 <%= link_to url_for->query(upload => 1) => begin %>upload media<% end %>
 </p>
 <ul>
-<li><%= app->home %>/<%= $entry_db %></li>
 </ul>
 </body>
 </html>
