@@ -1,8 +1,8 @@
-**smallblog**
+__smallblog__
 this is a ridiculously simple blog using sqlite and mojolicious
 
-**pkgsrc-dashboard**
+__pkgsrc-dashboard__
 old pkgsrc support website
 
-**rgwiki**
+__rgwiki__
 a single php file wiki
