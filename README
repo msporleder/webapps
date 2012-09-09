@@ -1,1 +1,8 @@
+'smallblog'
 this is a ridiculously simple blog using sqlite and mojolicious
+
+'pkgsrc-dashboard'
+old pkgsrc support website
+
+'rgwiki'
+a single php file wiki
