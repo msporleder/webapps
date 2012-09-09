@@ -1,0 +1,13 @@
+INSTALL:
+Copy the rgwiki.php file somewhere and call it anything.
+Customize the $dbase variable to be a directory where the web server can write.
+Customize the $sec_password variable to be a password for updating.
+
+Add any static stuff in the TOP, MIDDLE, and BOTTOM areas.
+I've included a little javascript to show/hide the edit form.
+
+USE:
+Just enter html into the text box, and the password into the password box.  Internal pages are turned into links automatically when you put a word in [brackets] (this would create brackets.wiki and contain your content)
+
+This is the rg wiki.
+The main goals here: stay portable and compact.
