@@ -76,8 +76,8 @@ any '/admin' => sub {
   {
     if ($self->req->param("delete"))
     {
-      $self->render(text => "deleting " . $self->req->param("delete"));
       del_entry($entry_db, $self->req->param("delete"));
+      $self->render(text => "deleting " . $self->req->param("delete"));
     }
     if ($self->req->method =~ /(?i:get)/)
     {
@@ -246,7 +246,7 @@ sub get_entry
 #TODO add better error handling
   foreach my $e (@$res)
   {
-    my $sqltags = "SELECT text AS t_text from tags WHERE ref = $res->[0]->{id}";
+    my $sqltags = "SELECT text AS t_text from tags WHERE ref = $e->{id}";
     my @restags = @{$dbh->selectall_arrayref($sqltags, { Slice => {} })};
     my @tags;
     foreach my $t (@restags) { push(@tags, $t->{t_text}); }
@@ -272,12 +272,15 @@ sub del_entry
   my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","");
 #todo get the tags list
   $dbh->do("PRAGMA foreign_keys = ON");
-  my $sth;
   my $res;
-  if ($entry =~ m#\d+#)
+  if ($entry =~ m#^\d+$#)
   {
-    $sth = $dbh->prepare('DELETE from blog WHERE id=?');
-    $sth->execute($entry);
+    my $rv = $dbh->do("DELETE from tags WHERE ref=$entry");
+    my $rv2 = $dbh->do("DELETE from blog WHERE id=$entry");
+  }
+  else
+  {
+    print "wtf? $dbfile, $entry\n";
   }
   
 }
