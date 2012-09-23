@@ -72,15 +72,27 @@ any '/admin' => sub {
     }
   }
 #/newpost
+  if ($self->req->param("editpost") eq 1)
+  {
+    if ($self->req->param("delete"))
+    {
+      $self->render(text => "deleting " . $self->req->param("delete"));
+      del_entry($entry_db, $self->req->param("delete"));
+    }
+    if ($self->req->method =~ /(?i:get)/)
+    {
+      my $cur_page = $self->param('page') || 0;
+      my $latest = get_entry($entry_db, 0, $cur_page);
+      my $total_page = get_total_pages($entry_db);
+      $self->stash(total_page => $total_page->[0]->{tot});
+      $self->stash(content => $latest);
+      $self->render('editpost');
+    }
+  }
+#/editpost
   $self->render('admin');
 };
 
-
-any '/editpost' => sub
-{
-  my $self = shift;
-  $self->render('editpost');
-};
 
 get '/rss.xml' => sub
 {
@@ -218,18 +230,28 @@ sub get_entry
   $dbh->do("PRAGMA foreign_keys = ON");
   my $sql;
   my $res;
-  my @keys = ("blog.id", "blog.sb_date", "blog.slug", "blog.title", "blog.text", "tags.text as t_text");
+  my @keys = ("blog.id", "blog.sb_date", "blog.slug", "blog.title", "blog.text");
   my $keys_txt = join(",", @keys);
   if ($entry eq "0")
   {
-    $sql = "SELECT $keys_txt from blog INNER JOIN tags ON blog.id = tags.ref ORDER BY strftime('%s',blog.sb_date) DESC LIMIT $limit_page OFFSET $cur_page";
+    $sql = "SELECT $keys_txt from blog ORDER BY strftime('%s',blog.sb_date) DESC LIMIT $limit_page OFFSET $cur_page";
+    $res = $dbh->selectall_arrayref($sql, { Slice => {} });
   }
   else
   {
-    $sql = "SELECT $keys_txt from blog INNER JOIN tags ON blog.id = tags.ref WHERE slug = \"$entry\"";
+    #single entry
+    $sql = "SELECT $keys_txt from blog WHERE slug = \"$entry\"";
+    $res = $dbh->selectall_arrayref($sql, { Slice => {} });
   }
 #TODO add better error handling
-  $res = $dbh->selectall_arrayref($sql, { Slice => {} });
+  foreach my $e (@$res)
+  {
+    my $sqltags = "SELECT text AS t_text from tags WHERE ref = $res->[0]->{id}";
+    my @restags = @{$dbh->selectall_arrayref($sqltags, { Slice => {} })};
+    my @tags;
+    foreach my $t (@restags) { push(@tags, $t->{t_text}); }
+    $e->{t_text} = join(",", @tags);
+  }
   return $res;
 }
 
@@ -241,6 +263,23 @@ sub get_total_pages
   my $sql = "SELECT count(*)/$limit_page as tot from blog";
   my $res = $dbh->selectall_arrayref($sql, { Slice => {} });
   return $res;
+}
+
+sub del_entry
+{
+  my $dbfile = shift;
+  my $entry = shift;
+  my $dbh = DBI->connect("dbi:SQLite:dbname=$dbfile","","");
+#todo get the tags list
+  $dbh->do("PRAGMA foreign_keys = ON");
+  my $sth;
+  my $res;
+  if ($entry =~ m#\d+#)
+  {
+    $sth = $dbh->prepare('DELETE from blog WHERE id=?');
+    $sth->execute($entry);
+  }
+  
 }
 
 app->start;
@@ -370,9 +409,28 @@ __DATA__
 <html>
 <head><title>edit post</title></head>
 <body>
-list posts<br />
-add tags<br />
-edit post<br />
+% foreach my $art (@$content)
+% {
+% my $slug = Mojo::Util::b64_decode $art->{slug};
+<div class="entry">
+ id: <%= $art->{id} %> <a href="<%= url_for('admin')->query(editpost => 1, delete => $art->{id}) %>">del</a> 
+                       <a href="<%= url_for('admin')->query(editpost => 1, edit => $art->{id}) %>">edit</a>
+<br />
+ title: <%= $art->{title} %><br />
+ slug: <%= url_for $slug %><br />
+ tags: <%= $art->{t_text} %><br />
+ text: <%= $art->{text} %><br />
+<div class="between"><hr /><br /></div>
+% }
+<div class="botnav">
+% for (my $i = 0; $i <= $total_page; $i++)
+% {
+%  if ($total_page > 1)
+%  {
+<a href="<%= url_for('admin')->query(editpost => 1, page => $i) %>"><%= $i %></a>
+%  }
+% }
+</div>
 </body>
 </html>
 
