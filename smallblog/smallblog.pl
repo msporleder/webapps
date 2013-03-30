@@ -94,7 +94,7 @@ any '/admin' => sub {
 };
 
 
-get '/rss.xml' => sub
+get '/rss' => sub
 {
   my $self = shift;
   my $latest = get_entry($entry_db, 0, 0);
@@ -106,7 +106,7 @@ get '/rss.xml' => sub
   $self->render('rss');
 };
 
-get '/atom.xml' => sub
+get '/atom' => sub
 {
   my $self = shift;
   my $latest = get_entry($entry_db, 0, 0);
@@ -317,7 +317,7 @@ __DATA__
 <?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
 <channel>
-<atom:link href="<%= (url_for)->to_abs %>" rel="self" type="application/rss+xml" />
+<atom:link href="<%= (url_for)->to_abs %>.xml" rel="self" type="application/rss+xml" />
 <title><%= $site_title %></title>
 <description><%= $site_description %></description>
 <link><%= (url_for "entry")->to_abs %></link>
