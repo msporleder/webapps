@@ -34,12 +34,13 @@ any '/admin' => sub {
   my $self = shift;
   $self->res->headers->cache_control("no-cache");
 #get auth
-  if (! $self->req->headers->authorization || ! check_auth($self->req->headers->authorization) )
+#  if (! $self->req->headers->authorization || ! check_auth($self->req->headers->authorization) )
+  if (! check_auth($self->req->headers->authorization) )
   {
     $self->res->headers->www_authenticate("Basic realm=\"$site_title\"");
     $self->res->code("401");
     $self->stash(auth => $self->req->headers->authorization);
-    $self->render('401');
+    return $self->render('401');
   }
 
   if ($self->req->param("create_db") eq 1)
@@ -48,7 +49,11 @@ any '/admin' => sub {
     if (! -f $entry_db)
     {
       init_entry_db($entry_db);
-      $self->render(text => "creating db");
+      return $self->render(text => "creating db");
+    }
+    else
+    {
+      return $self->render(text => "already exists");
     }
   }
 
@@ -56,7 +61,7 @@ any '/admin' => sub {
   {
     if ($self->req->method =~ /(?i:get)/)
     {
-      $self->render('newpost');
+      return $self->render('newpost');
     }
     if ($self->req->method =~ /(?i:post)/)
     {
@@ -67,7 +72,7 @@ any '/admin' => sub {
       if ($title and $entry)
       {
         insert_entry($entry_db, $title, $entry, $tags, $date);
-        $self->render(text => "$title, $entry <br />$tags");
+        return $self->render(text => "$title, $entry <br />$tags");
       }
     }
   }
@@ -77,7 +82,7 @@ any '/admin' => sub {
     if ($self->req->param("delete"))
     {
       del_entry($entry_db, $self->req->param("delete"));
-      $self->render(text => "deleting " . $self->req->param("delete"));
+      return $self->render(text => "deleting " . $self->req->param("delete"));
     }
     if ($self->req->method =~ /(?i:get)/)
     {
@@ -86,11 +91,11 @@ any '/admin' => sub {
       my $total_page = get_total_pages($entry_db);
       $self->stash(total_page => $total_page->[0]->{tot});
       $self->stash(content => $latest);
-      $self->render('editpost');
+      return $self->render('editpost');
     }
   }
 #/editpost
-  $self->render('admin');
+  return $self->render('admin');
 };
 
 
@@ -103,7 +108,7 @@ get '/rss' => sub
   $self->stash(site_description => $site_description);
   $self->stash(site_author => $site_author);
   $self->stash(page_ttl => $page_ttl);
-  $self->render('rss');
+  return $self->render('rss');
 };
 
 get '/atom' => sub
@@ -114,7 +119,7 @@ get '/atom' => sub
   $self->stash(site_title => $site_title);
   $self->stash(site_description => $site_description);
   $self->stash(site_author => $site_author);
-  $self->render('atom');
+  return $self->render('atom');
 };
 
 #last because it catches everything else
@@ -132,7 +137,7 @@ get '/(*entry)' => {entry => 'latest'} => sub
     $self->stash(cur_page => $cur_page);
     $self->stash(total_page => $total_page->[0]->{tot});
     $self->stash(site_title => $site_title);
-    $self->render;
+    return $self->render;
   }
   else
   {
@@ -146,12 +151,12 @@ get '/(*entry)' => {entry => 'latest'} => sub
     if (! $latest->[0])
     {
       $self->res->code("404");
-      $self->render('404');
+      return $self->render('404');
     }
     $self->stash(content => $latest);
     $self->stash(total_page => 0);
     $self->stash(site_title => $latest->[0]->{title});
-    $self->render;
+    return $self->render;
   }
   
 };
