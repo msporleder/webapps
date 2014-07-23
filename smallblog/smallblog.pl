@@ -27,7 +27,7 @@ my $site_description = $config->{site_description};
 my $site_author = $config->{site_author};
 my $entry_db = $config->{entry_db_base} . "/entry.db";
 
-app->secret('mojosmallblog');
+app->secrets(['mojosmallblog']);
 
 
 any '/admin' => sub {
